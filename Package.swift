@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         .target(name: "RepoCommonsCore"),
+        .executableTarget(name: "RepoCommons", dependencies: ["RepoCommonsCore"]),
         .testTarget(name: "RepoCommonsCoreTests", dependencies: ["RepoCommonsCore"]),
     ]
 )
