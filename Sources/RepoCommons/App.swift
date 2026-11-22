@@ -53,6 +53,17 @@ final class Store {
     private(set) var folders = (UserDefaults.standard.stringArray(forKey: "folders") ?? []).map { URL(fileURLWithPath: $0) }
     private(set) var repos: [Repo] = []
     private(set) var running = false
+    /// Paths of repos the user chose to ignore: hidden from the dashboard and skipped by batch fetch/pull.
+    private(set) var ignored = Set(UserDefaults.standard.stringArray(forKey: "ignored") ?? [])
+
+    func isIgnored(_ url: URL) -> Bool { ignored.contains(url.path) }
+
+    func setIgnored(_ urls: Set<URL>, _ value: Bool) {
+        for url in urls {
+            if value { ignored.insert(url.path) } else { ignored.remove(url.path) }
+        }
+        UserDefaults.standard.set(ignored.sorted(), forKey: "ignored")
+    }
 
     func addFolders() {
         let panel = NSOpenPanel()
@@ -105,7 +116,7 @@ final class Store {
         guard !running else { return }
         running = true
         defer { running = false }
-        let targets = repos.filter { folder == nil || $0.folder == folder }.map(\.url)
+        let targets = repos.filter { (folder == nil || $0.folder == folder) && !isIgnored($0.url) }.map(\.url)
         for url in targets { update(url) { $0.busy = true } }
         await Git.batch(targets) { url in
             var result = "\(op.rawValue) ok", failed = false
@@ -138,7 +149,7 @@ final class Store {
     }
 }
 
-enum Scope: Hashable { case all, folder(URL) }
+enum Scope: Hashable { case all, folder(URL), ignored }
 
 /// Sidebar row whose icon carries the brand orange instead of the system accent.
 struct BrandLabel: View {
@@ -164,12 +175,16 @@ struct ContentView: View {
 
     private var visible: [Repo] {
         store.repos.filter {
-            (folder == nil || $0.folder == folder)
+            if scope == .ignored { return store.isIgnored($0.url) }
+            return !store.isIgnored($0.url)
+                && (folder == nil || $0.folder == folder)
                 && (!onlyDirty || $0.isDirty)
                 && (!onlyUnpushed || $0.hasUnpushed)
         }
         .sorted(using: sortOrder)
     }
+
+    private var ignoredCount: Int { store.repos.filter { store.isIgnored($0.url) }.count }
 
     var body: some View {
         NavigationSplitView {
@@ -194,8 +209,16 @@ struct ContentView: View {
                             }
                     }
                 }
+                if ignoredCount > 0 {
+                    Section {
+                        BrandLabel(title: "Ignorados", icon: "eye.slash")
+                            .badge(ignoredCount)
+                            .tag(Scope.ignored)
+                    }
+                }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+            .onChange(of: ignoredCount) { if ignoredCount == 0, scope == .ignored { scope = .all } }
         } detail: {
             if store.folders.isEmpty {
                 ContentUnavailableView {
@@ -222,7 +245,7 @@ struct ContentView: View {
                     Button("Pull", systemImage: "arrow.down.to.line") { Task { await store.run(.pull, in: folder) } }
                         .help(folder == nil ? "Pull (ff-only) em todos os repos" : "Pull (ff-only) nos repos desta pasta")
                 }
-                .disabled(store.running)
+                .disabled(store.running || scope == .ignored)
             }
         }
         .task { await store.refresh() }
@@ -298,6 +321,12 @@ struct ContentView: View {
             Button("Copiar path") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(urls.map(\.path).joined(separator: "\n"), forType: .string)
+            }
+            Divider()
+            if scope == .ignored {
+                Button("Deixar de ignorar") { store.setIgnored(urls, false) }
+            } else {
+                Button("Ignorar") { store.setIgnored(urls, true) }
             }
         } primaryAction: { urls in
             urls.forEach { NSWorkspace.shared.open($0) }
