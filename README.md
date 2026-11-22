@@ -44,7 +44,7 @@ The interface is in Brazilian Portuguese. Labels below are quoted as they appear
 5. **Work on a repo.** Double click opens it in Finder. Right click offers "Mostrar no Finder" (show in Finder), "Abrir no Terminal" (open in Terminal), "Abrir com Code" (VS Code), "Abrir com Zed" and "Copiar path" (copy path). Editors appear only when installed.
 6. **Ignore a repo.** Right click > "Ignorar" (ignore) hides a repo and skips it in batch fetch/pull. Ignored repos are listed under "Ignorados" in the sidebar, where right click > "Deixar de ignorar" brings them back.
 
-7. **Hand pending work to a coding agent.** Right click a folder in the sidebar > "Copiar relatório" (copy report) copies a Markdown list of that folder's repos with pending work, one absolute path per line with what is pending, ready to paste into a coding agent:
+7. **Hand pending work to a coding agent.** Right click a folder in the sidebar > "Copiar relatório" (copy report) copies a Markdown list of that folder's repos with pending work (right click "Todas" for every folder), one absolute path per line with what is pending, ready to paste into a coding agent:
 
    ```
    Repos com mudanças pendentes em /Users/me/Work (3):

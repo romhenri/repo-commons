@@ -233,7 +233,7 @@ private func pushFromElsewhere(_ root: URL, _ remote: URL, _ name: String) throw
     var clean = RepoStatus(); clean.branch = "main"; clean.hasUpstream = true; clean.behind = 4
     let detached = RepoStatus() // detached HEAD, nothing to push: not pending
 
-    let report = pendingReport(folder: folder, repos: [
+    let report = pendingReport(scope: folder.path, repos: [
         (URL(fileURLWithPath: "/w/b"), unpushed),
         (URL(fileURLWithPath: "/w/a"), dirty),
         (URL(fileURLWithPath: "/w/c"), clean),
@@ -251,5 +251,5 @@ private func pushFromElsewhere(_ root: URL, _ remote: URL, _ name: String) throw
 }
 
 @Test func pendingReportSaysWhenEverythingIsClean() {
-    #expect(pendingReport(folder: URL(fileURLWithPath: "/w"), repos: []) == "Nenhum repo com mudanças pendentes em /w.\n")
+    #expect(pendingReport(scope: "todas as pastas", repos: []) == "Nenhum repo com mudanças pendentes em todas as pastas.\n")
 }

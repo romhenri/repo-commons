@@ -55,13 +55,13 @@ final class Store {
 
     func isIgnored(_ url: URL) -> Bool { ignored.contains(url.path) }
 
-    /// Copies the pending-work report of a folder (ignored repos excluded) to the clipboard.
-    func copyReport(for folder: URL) {
+    /// Copies the pending-work report of one folder, or of all folders when nil (ignored repos excluded).
+    func copyReport(for folder: URL?) {
         let repos = repos.compactMap { repo in
-            repo.folder == folder && !isIgnored(repo.url) ? repo.status.map { (url: repo.url, status: $0) } : nil
+            (folder == nil || repo.folder == folder) && !isIgnored(repo.url) ? repo.status.map { (url: repo.url, status: $0) } : nil
         }
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(pendingReport(folder: folder, repos: repos), forType: .string)
+        NSPasteboard.general.setString(pendingReport(scope: folder?.path ?? "todas as pastas", repos: repos), forType: .string)
     }
 
     func setIgnored(_ urls: Set<URL>, _ value: Bool) {
@@ -195,20 +195,16 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $scope) {
-                BrandLabel(title: "Todas", icon: "square.stack.3d.up").tag(Scope.all)
+                BrandLabel(title: "Todas", icon: "square.stack.3d.up")
+                    .tag(Scope.all)
+                    .contextMenu { batchMenu(for: nil) }
                 Section("Pastas") {
                     ForEach(store.folders, id: \.self) { folder in
                         BrandLabel(title: folder.lastPathComponent, icon: "folder")
                             .help(folder.path)
                             .tag(Scope.folder(folder))
                             .contextMenu {
-                                Group {
-                                    Button("Fetch") { Task { await store.run(.fetch, in: folder) } }
-                                    Button("Pull") { Task { await store.run(.pull, in: folder) } }
-                                }
-                                .disabled(store.running)
-                                Button("Copiar relatório") { store.copyReport(for: folder) }
-                                    .help("Copia os paths dos repos com mudanças pendentes, para colar num coding agent")
+                                batchMenu(for: folder)
                                 Divider()
                                 Button("Remover") {
                                     if scope == .folder(folder) { scope = .all }
@@ -339,6 +335,17 @@ struct ContentView: View {
         } primaryAction: { urls in
             urls.forEach { NSWorkspace.shared.open($0) }
         }
+    }
+
+    /// Sidebar menu shared by "Todas" (folder nil = every folder) and each folder.
+    @ViewBuilder private func batchMenu(for folder: URL?) -> some View {
+        Group {
+            Button("Fetch") { Task { await store.run(.fetch, in: folder) } }
+            Button("Pull") { Task { await store.run(.pull, in: folder) } }
+        }
+        .disabled(store.running)
+        Button("Copiar relatório") { store.copyReport(for: folder) }
+            .help("Copia os paths dos repos com mudanças pendentes, para colar num coding agent")
     }
 
     /// "Open with" targets in the row context menu; an app missing from this Mac is simply not listed.

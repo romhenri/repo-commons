@@ -144,9 +144,10 @@ extension RepoStatus {
 }
 
 /// Markdown list of the repos with pending work, one absolute path per line, meant to be pasted into a coding agent.
-public func pendingReport(folder: URL, repos: [(url: URL, status: RepoStatus)]) -> String {
+/// `scope` names where the repos come from: a folder path, or "todas as pastas".
+public func pendingReport(scope: String, repos: [(url: URL, status: RepoStatus)]) -> String {
     let pending = repos.filter { $0.status.isPending }.sorted { $0.url.path < $1.url.path }
-    guard !pending.isEmpty else { return "Nenhum repo com mudanças pendentes em \(folder.path).\n" }
+    guard !pending.isEmpty else { return "Nenhum repo com mudanças pendentes em \(scope).\n" }
     func count(_ n: Int, _ one: String, _ many: String) -> String { "\(n) \(n == 1 ? one : many)" }
     let lines = pending.map { url, s in
         var parts: [String] = []
@@ -157,5 +158,5 @@ public func pendingReport(folder: URL, repos: [(url: URL, status: RepoStatus)]) 
         if s.behind > 0 { parts.append(count(s.behind, "commit atrás do remoto", "commits atrás do remoto")) }
         return "- \(url.path) [\(s.branch ?? "detached")]: " + parts.joined(separator: ", ")
     }
-    return "Repos com mudanças pendentes em \(folder.path) (\(pending.count)):\n\n" + lines.joined(separator: "\n") + "\n"
+    return "Repos com mudanças pendentes em \(scope) (\(pending.count)):\n\n" + lines.joined(separator: "\n") + "\n"
 }
