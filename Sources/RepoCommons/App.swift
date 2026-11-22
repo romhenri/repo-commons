@@ -288,7 +288,13 @@ struct ContentView: View {
         }
         .contextMenu(forSelectionType: URL.self) { urls in
             Button("Mostrar no Finder") { NSWorkspace.shared.activateFileViewerSelecting(Array(urls)) }
-            Button("Abrir no Terminal") { openInTerminal(urls) }
+            ForEach(openers, id: \.bundleID) { opener in
+                if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: opener.bundleID) {
+                    Button(opener.title) {
+                        NSWorkspace.shared.open(Array(urls), withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
+                    }
+                }
+            }
             Button("Copiar path") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(urls.map(\.path).joined(separator: "\n"), forType: .string)
@@ -298,8 +304,10 @@ struct ContentView: View {
         }
     }
 
-    private func openInTerminal(_ urls: Set<URL>) {
-        let terminal = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
-        NSWorkspace.shared.open(Array(urls), withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
-    }
+    /// "Open with" targets in the row context menu; an app missing from this Mac is simply not listed.
+    private let openers = [
+        (title: "Abrir no Terminal", bundleID: "com.apple.Terminal"),
+        (title: "Abrir com Code", bundleID: "com.microsoft.VSCode"),
+        (title: "Abrir com Zed", bundleID: "dev.zed.Zed"),
+    ]
 }
