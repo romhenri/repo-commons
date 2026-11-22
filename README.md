@@ -1,6 +1,8 @@
-# repo-commons
+# <img src="docs/logo.png" width="40" align="center" alt=""> repo-commons
 
 Painel nativo para macOS que mostra vários repositórios git de uma vez. Implementação clean-room, open source (GPL-3.0), inspirada em ferramentas de "frota de repos" como o RepoFlock. Não contém código nem assets de terceiros.
+
+![repo-commons mostrando repos de duas pastas com mudanças, commits não enviados e data do último commit](docs/screenshot.png)
 
 ## O que faz
 
