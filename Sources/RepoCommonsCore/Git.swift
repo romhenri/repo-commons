@@ -73,6 +73,11 @@ public enum Git {
         _ = try await run(["pull", "--ff-only", "--quiet"], in: repo)
     }
 
+    /// Plain `git push`, never forced: a diverged remote is rejected with git's message.
+    public static func push(_ repo: URL) async throws {
+        _ = try await run(["push", "--quiet"], in: repo)
+    }
+
     /// Runs `body` for every item, at most `limit` at a time.
     public static func batch<T: Sendable>(_ items: [T], limit: Int = 4, _ body: @escaping @Sendable (T) async -> Void) async {
         await withTaskGroup(of: Void.self) { group in

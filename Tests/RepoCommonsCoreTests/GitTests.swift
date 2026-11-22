@@ -252,3 +252,19 @@ private func pushFromElsewhere(_ root: URL, _ remote: URL, _ name: String) throw
 @Test func pendingReportSaysWhenEverythingIsClean() {
     #expect(pendingReport(scope: "todas as pastas", repos: []) == "Nenhum repo com mudanças pendentes em todas as pastas.\n")
 }
+
+@Test func pushSendsLocalCommits() async throws {
+    let (_, remote, clone) = try clonedRepo()
+    try commit(clone, "local")
+    try await Git.push(clone)
+    #expect(try await Git.status(of: clone).ahead == 0)
+    #expect(try sh(remote, "log", "--format=%s", "-1").contains("local"))
+}
+
+@Test func divergedPushIsRejectedNeverForced() async throws {
+    let (root, remote, clone) = try clonedRepo()
+    try pushFromElsewhere(root, remote, "theirs")
+    try commit(clone, "mine")
+    await #expect(throws: GitError.self) { try await Git.push(clone) }
+    #expect(try sh(remote, "log", "--format=%s", "-1").contains("theirs"))
+}

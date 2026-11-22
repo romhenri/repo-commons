@@ -13,5 +13,5 @@ Native macOS dashboard for many git repos. Swift + SwiftUI, macOS 14+, SwiftPM o
 
 - UI text is Brazilian Portuguese, hardcoded. Dates use the `pt_BR` locale.
 - Clean-room project: inspired by RepoFlock, built only from original code, names and assets.
-- Pull is always `git pull --ff-only` and runs only on a user click. Batch git operations run at most 4 at a time (`Git.batch`).
+- Pull is always `git pull --ff-only` and push is a plain `git push`, never forced. Both run only on a user click. Batch git operations run at most 4 at a time (`Git.batch`).
 - Tests are integration tests against real git repos in a temp dir, at the `RepoCommonsCore` public API. New core behaviour gets its test there first.

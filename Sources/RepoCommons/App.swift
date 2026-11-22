@@ -43,7 +43,7 @@ struct Repo: Identifiable {
     var lastCommitKey: Date { status?.lastCommit ?? .distantPast }
 }
 
-enum Op: String { case fetch, pull }
+enum Op: String { case fetch, pull, push }
 
 @MainActor @Observable
 final class Store {
@@ -118,11 +118,15 @@ final class Store {
         }
     }
 
+    /// Batch op over a folder, or every folder when nil, skipping ignored repos.
     func run(_ op: Op, in folder: URL?) async {
+        await run(op, on: repos.filter { (folder == nil || $0.folder == folder) && !isIgnored($0.url) }.map(\.url))
+    }
+
+    func run(_ op: Op, on targets: [URL]) async {
         guard !running else { return }
         running = true
         defer { running = false }
-        let targets = repos.filter { (folder == nil || $0.folder == folder) && !isIgnored($0.url) }.map(\.url)
         for url in targets { update(url) { $0.busy = true } }
         await Git.batch(targets) { url in
             var result = "\(op.rawValue) ok", failed = false
@@ -130,6 +134,7 @@ final class Store {
                 switch op {
                 case .fetch: try await Git.fetch(url)
                 case .pull: try await Git.pull(url)
+                case .push: try await Git.push(url)
                 }
             } catch {
                 result = Self.message(error)
@@ -313,6 +318,9 @@ struct ContentView: View {
                     }
                 }
             }
+            Divider()
+            Button("Push") { Task { await store.run(.push, on: Array(urls)) } }
+                .disabled(store.running)
             Button("Copiar path") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(urls.map(\.path).joined(separator: "\n"), forType: .string)
