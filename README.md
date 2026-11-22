@@ -34,9 +34,11 @@ The interface is in Brazilian Portuguese. Labels below are quoted as they appear
    | Repo | Repo folder name |
    | Branch | Current branch. "· sem upstream" (no upstream) in orange when it was never pushed |
    | Mudanças (changes) | Number of uncommitted files: staged, modified and untracked, respecting `.gitignore`. Hover for the breakdown |
-   | ↑ ↓ | Commits ahead of / behind the upstream. A "+N branch" badge means other local branches have unpushed commits too |
+   | ↑ ↓ | Commits ahead of / behind the upstream |
    | Status | Result of the last fetch or pull, or git's error message |
    | Último commit (last commit) | Relative date of the latest commit on the current branch |
+
+   Only the checked-out branch is considered: other local branches are not checked.
 
    Click any column header to sort by it, and click again to reverse the order.
 3. **Fetch or pull in batch.** The toolbar Fetch and Pull buttons act on the sidebar selection: "Todas" (all) or a single folder. Up to 4 repos run at a time. Pull is `git pull --ff-only`: a diverged branch fails with git's message and the repo is left untouched. Nothing is fetched or pulled automatically.

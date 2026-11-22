@@ -106,7 +106,6 @@ private func clonedRepo() throws -> (URL, URL, URL) {
     try commit(clone, "c2")
     let s = try await Git.status(of: clone)
     #expect(s.ahead == 2)
-    #expect(s.unpushedBranches.isEmpty) // current branch is reported via ahead, not here
 }
 
 @Test func branchWithoutUpstreamIsFlagged() async throws {
@@ -117,7 +116,7 @@ private func clonedRepo() throws -> (URL, URL, URL) {
     #expect(!s.hasUpstream)
 }
 
-@Test func otherLocalBranchesWithUnpushedWorkAreListed() async throws {
+@Test func onlyTheActiveBranchCounts() async throws {
     let (_, _, clone) = try clonedRepo()
     try sh(clone, "switch", "-qc", "local-only")      // no upstream
     try sh(clone, "switch", "-q", "main")
@@ -127,8 +126,9 @@ private func clonedRepo() throws -> (URL, URL, URL) {
     try sh(clone, "switch", "-qc", "synced", "origin/main") // tracked and in sync: not listed
     try sh(clone, "switch", "-q", "main")
 
-    let s = try await Git.status(of: clone)
-    #expect(s.unpushedBranches == ["local-only", "tracked"])
+    let s = try await Git.status(of: clone)   // on main: clean and in sync
+    #expect(!s.hasUnpushed)
+    #expect(!s.isPending)
 }
 
 /// Pushes a new commit to the remote from a second clone.
@@ -207,7 +207,6 @@ private func pushFromElsewhere(_ root: URL, _ remote: URL, _ name: String) throw
 
     let s = try await Git.status(of: clone)   // on doomed, upstream origin/temp is gone
     #expect(!s.hasUpstream)
-    #expect(s.unpushedBranches == ["temp"])   // temp has unpushed work and a gone upstream
 }
 
 @Test func reportsLastCommitDateOfCurrentBranch() async throws {
@@ -229,7 +228,7 @@ private func pushFromElsewhere(_ root: URL, _ remote: URL, _ name: String) throw
     var dirty = RepoStatus(); dirty.branch = "main"; dirty.hasUpstream = true
     dirty.changes = 3; dirty.behind = 1
     var unpushed = RepoStatus(); unpushed.branch = "main"; unpushed.hasUpstream = true; unpushed.ahead = 1
-    var noUpstream = RepoStatus(); noUpstream.branch = "feat/x"; noUpstream.unpushedBranches = ["old", "spike"]
+    var noUpstream = RepoStatus(); noUpstream.branch = "feat/x"
     var clean = RepoStatus(); clean.branch = "main"; clean.hasUpstream = true; clean.behind = 4
     let detached = RepoStatus() // detached HEAD, nothing to push: not pending
 
@@ -245,7 +244,7 @@ private func pushFromElsewhere(_ root: URL, _ remote: URL, _ name: String) throw
 
     - /w/a [main]: 3 arquivos não commitados, 1 commit atrás do remoto
     - /w/b [main]: 1 commit não enviado
-    - /w/d [feat/x]: sem upstream, outras branches não enviadas: old, spike
+    - /w/d [feat/x]: sem upstream
 
     """)
 }

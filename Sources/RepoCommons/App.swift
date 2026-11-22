@@ -280,17 +280,8 @@ struct ContentView: View {
             .width(70)
             TableColumn("↑ ↓", value: \.aheadKey) { repo in
                 if let s = repo.status {
-                    HStack {
-                        Text("↑\(s.ahead) ↓\(s.behind)")
-                            .foregroundStyle(s.ahead > 0 ? .orange : .secondary)
-                        if !s.unpushedBranches.isEmpty {
-                            Text("+\(s.unpushedBranches.count) branch")
-                                .font(.caption)
-                                .padding(.horizontal, 4)
-                                .background(.orange.opacity(0.2), in: Capsule())
-                                .help("Unpushed: " + s.unpushedBranches.joined(separator: ", "))
-                        }
-                    }
+                    Text("↑\(s.ahead) ↓\(s.behind)")
+                        .foregroundStyle(s.ahead > 0 ? .orange : .secondary)
                 }
             }
             TableColumn("Status", value: \.resultKey) { repo in

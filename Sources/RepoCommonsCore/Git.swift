@@ -17,8 +17,6 @@ public struct RepoStatus: Equatable, Sendable {
     public var changes = 0
     /// Commit date of HEAD; nil in a repo with no commits yet.
     public var lastCommit: Date?
-    /// Other local branches that are ahead of their upstream, or whose upstream is unset or gone.
-    public var unpushedBranches: [String] = []
 }
 
 public enum Git {
@@ -62,12 +60,6 @@ public enum Git {
         if hasCommits {
             let ts = try await run(["log", "-1", "--format=%ct"], in: repo)
             s.lastCommit = Double(ts.trimmingCharacters(in: .whitespacesAndNewlines)).map(Date.init(timeIntervalSince1970:))
-        }
-        let refs = try await run(["for-each-ref", "--format=%(refname:short)%09%(upstream)%09%(upstream:track)", "refs/heads"], in: repo)
-        for line in refs.split(separator: "\n") {
-            let f = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
-            guard f.count == 3, f[0] != s.branch else { continue }
-            if f[1].isEmpty || f[2].contains("ahead") || f[2].contains("gone") { s.unpushedBranches.append(f[0]) }
         }
         return s
     }
@@ -138,8 +130,8 @@ public enum Git {
 
 extension RepoStatus {
     public var isDirty: Bool { changes > 0 }
-    /// Commits to push on any local branch, or a current branch never pushed. A detached HEAD has nothing to push.
-    public var hasUnpushed: Bool { ahead > 0 || (branch != nil && !hasUpstream) || !unpushedBranches.isEmpty }
+    /// Only the active branch counts: commits to push, or a branch never pushed. A detached HEAD has nothing to push.
+    public var hasUnpushed: Bool { ahead > 0 || (branch != nil && !hasUpstream) }
     public var isPending: Bool { isDirty || hasUnpushed }
 }
 
@@ -154,7 +146,6 @@ public func pendingReport(scope: String, repos: [(url: URL, status: RepoStatus)]
         if s.changes > 0 { parts.append(count(s.changes, "arquivo não commitado", "arquivos não commitados")) }
         if s.ahead > 0 { parts.append(count(s.ahead, "commit não enviado", "commits não enviados")) }
         if s.branch != nil && !s.hasUpstream { parts.append("sem upstream") }
-        if !s.unpushedBranches.isEmpty { parts.append("outras branches não enviadas: " + s.unpushedBranches.joined(separator: ", ")) }
         if s.behind > 0 { parts.append(count(s.behind, "commit atrás do remoto", "commits atrás do remoto")) }
         return "- \(url.path) [\(s.branch ?? "detached")]: " + parts.joined(separator: ", ")
     }
