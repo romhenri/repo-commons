@@ -32,11 +32,8 @@ struct Repo: Identifiable {
     var busy = false
     var id: URL { url }
     var name: String { url.lastPathComponent }
-    var isDirty: Bool { (status?.changes ?? 0) > 0 }
-    var hasUnpushed: Bool {
-        guard let s = status else { return false }
-        return s.ahead > 0 || (s.branch != nil && !s.hasUpstream) || !s.unpushedBranches.isEmpty
-    }
+    var isDirty: Bool { status?.isDirty ?? false }
+    var hasUnpushed: Bool { status?.hasUnpushed ?? false }
 
     // Sort keys for the table columns (missing values sort first).
     var branchKey: String { status?.branch ?? "" }
@@ -57,6 +54,15 @@ final class Store {
     private(set) var ignored = Set(UserDefaults.standard.stringArray(forKey: "ignored") ?? [])
 
     func isIgnored(_ url: URL) -> Bool { ignored.contains(url.path) }
+
+    /// Copies the pending-work report of a folder (ignored repos excluded) to the clipboard.
+    func copyReport(for folder: URL) {
+        let repos = repos.compactMap { repo in
+            repo.folder == folder && !isIgnored(repo.url) ? repo.status.map { (url: repo.url, status: $0) } : nil
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(pendingReport(folder: folder, repos: repos), forType: .string)
+    }
 
     func setIgnored(_ urls: Set<URL>, _ value: Bool) {
         for url in urls {
@@ -201,6 +207,8 @@ struct ContentView: View {
                                     Button("Pull") { Task { await store.run(.pull, in: folder) } }
                                 }
                                 .disabled(store.running)
+                                Button("Copiar relatório") { store.copyReport(for: folder) }
+                                    .help("Copia os paths dos repos com mudanças pendentes, para colar num coding agent")
                                 Divider()
                                 Button("Remover") {
                                     if scope == .folder(folder) { scope = .all }

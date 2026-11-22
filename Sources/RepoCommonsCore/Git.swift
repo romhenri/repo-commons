@@ -135,3 +135,27 @@ public enum Git {
         return String(decoding: outData, as: UTF8.self)
     }
 }
+
+extension RepoStatus {
+    public var isDirty: Bool { changes > 0 }
+    /// Commits to push on any local branch, or a current branch never pushed. A detached HEAD has nothing to push.
+    public var hasUnpushed: Bool { ahead > 0 || (branch != nil && !hasUpstream) || !unpushedBranches.isEmpty }
+    public var isPending: Bool { isDirty || hasUnpushed }
+}
+
+/// Markdown list of the repos with pending work, one absolute path per line, meant to be pasted into a coding agent.
+public func pendingReport(folder: URL, repos: [(url: URL, status: RepoStatus)]) -> String {
+    let pending = repos.filter { $0.status.isPending }.sorted { $0.url.path < $1.url.path }
+    guard !pending.isEmpty else { return "Nenhum repo com mudanças pendentes em \(folder.path).\n" }
+    func count(_ n: Int, _ one: String, _ many: String) -> String { "\(n) \(n == 1 ? one : many)" }
+    let lines = pending.map { url, s in
+        var parts: [String] = []
+        if s.changes > 0 { parts.append(count(s.changes, "arquivo não commitado", "arquivos não commitados")) }
+        if s.ahead > 0 { parts.append(count(s.ahead, "commit não enviado", "commits não enviados")) }
+        if s.branch != nil && !s.hasUpstream { parts.append("sem upstream") }
+        if !s.unpushedBranches.isEmpty { parts.append("outras branches não enviadas: " + s.unpushedBranches.joined(separator: ", ")) }
+        if s.behind > 0 { parts.append(count(s.behind, "commit atrás do remoto", "commits atrás do remoto")) }
+        return "- \(url.path) [\(s.branch ?? "detached")]: " + parts.joined(separator: ", ")
+    }
+    return "Repos com mudanças pendentes em \(folder.path) (\(pending.count)):\n\n" + lines.joined(separator: "\n") + "\n"
+}

@@ -223,3 +223,33 @@ private func pushFromElsewhere(_ root: URL, _ remote: URL, _ name: String) throw
     try sh(folder, "init", "-q", "empty")
     #expect(try await Git.status(of: folder.appendingPathComponent("empty")).lastCommit == nil)
 }
+
+@Test func pendingReportListsOnlyReposWithWorkToDo() {
+    let folder = URL(fileURLWithPath: "/w")
+    var dirty = RepoStatus(); dirty.branch = "main"; dirty.hasUpstream = true
+    dirty.changes = 3; dirty.behind = 1
+    var unpushed = RepoStatus(); unpushed.branch = "main"; unpushed.hasUpstream = true; unpushed.ahead = 1
+    var noUpstream = RepoStatus(); noUpstream.branch = "feat/x"; noUpstream.unpushedBranches = ["old", "spike"]
+    var clean = RepoStatus(); clean.branch = "main"; clean.hasUpstream = true; clean.behind = 4
+    let detached = RepoStatus() // detached HEAD, nothing to push: not pending
+
+    let report = pendingReport(folder: folder, repos: [
+        (URL(fileURLWithPath: "/w/b"), unpushed),
+        (URL(fileURLWithPath: "/w/a"), dirty),
+        (URL(fileURLWithPath: "/w/c"), clean),
+        (URL(fileURLWithPath: "/w/d"), noUpstream),
+        (URL(fileURLWithPath: "/w/e"), detached),
+    ])
+    #expect(report == """
+    Repos com mudanças pendentes em /w (3):
+
+    - /w/a [main]: 3 arquivos não commitados, 1 commit atrás do remoto
+    - /w/b [main]: 1 commit não enviado
+    - /w/d [feat/x]: sem upstream, outras branches não enviadas: old, spike
+
+    """)
+}
+
+@Test func pendingReportSaysWhenEverythingIsClean() {
+    #expect(pendingReport(folder: URL(fileURLWithPath: "/w"), repos: []) == "Nenhum repo com mudanças pendentes em /w.\n")
+}
