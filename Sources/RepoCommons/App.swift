@@ -189,17 +189,24 @@ struct ContentView: View {
     @State private var onlyDirty = false
     @State private var onlyUnpushed = false
     @State private var sortOrder = [KeyPathComparator(\Repo.name)]
+    @State private var query = ""
 
     private var folder: URL? {
         if case .folder(let url) = scope { return url }
         return nil
     }
 
+    /// Matches name, full path or branch. A search spans every folder, not just the selected one.
+    private func matches(_ repo: Repo) -> Bool {
+        query.isEmpty || [repo.url.path, repo.status?.branch ?? ""].contains { $0.localizedStandardContains(query) }
+    }
+
     private var visible: [Repo] {
         store.repos.filter {
+            guard matches($0) else { return false }
             if scope == .ignored { return store.isIgnored($0.url) }
             return !store.isIgnored($0.url)
-                && (folder == nil || $0.folder == folder)
+                && (folder == nil || !query.isEmpty || $0.folder == folder)
                 && (!onlyDirty || $0.isDirty)
                 && (!onlyUnpushed || $0.hasUnpushed)
         }
@@ -249,13 +256,32 @@ struct ContentView: View {
                     Button("Adicionar pasta…") { store.addFolders() }
                 }
             } else {
-                table
+                VStack(spacing: 0) {
+                    // Own row under the toolbar instead of .searchable, which squeezes into the toolbar's width.
+                    HStack(spacing: 8) {
+                        HStack {
+                            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                            TextField("Buscar", text: $query, prompt: Text("Buscar por repo, caminho ou branch"))
+                                .textFieldStyle(.plain)
+                                .onExitCommand { query = "" }
+                            if !query.isEmpty {
+                                Button("Limpar", systemImage: "xmark.circle.fill") { query = "" }
+                                    .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 8).padding(.vertical, 6)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 7))
+                        Toggle("Só sujos", isOn: $onlyDirty).toggleStyle(.button)
+                        Toggle("Só unpushed", isOn: $onlyUnpushed).toggleStyle(.button)
+                    }
+                    .padding(10)
+                    Divider()
+                    table
+                }
             }
         }
         .toolbar {
             ToolbarItemGroup {
-                Toggle("Só sujos", isOn: $onlyDirty)
-                Toggle("Só unpushed", isOn: $onlyUnpushed)
                 Button("Adicionar pasta", systemImage: "folder.badge.plus") { store.addFolders() }
                 Group {
                     Button("Atualizar", systemImage: "arrow.clockwise") { Task { await store.refresh() } }
@@ -272,7 +298,8 @@ struct ContentView: View {
     }
 
     private var table: some View {
-        Table(visible, selection: $selection, sortOrder: $sortOrder) {
+        let visible = visible
+        return Table(visible, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("Repo", value: \.name) { repo in
                 HStack {
                     Text(repo.name)
@@ -320,6 +347,7 @@ struct ContentView: View {
             }
             .width(min: 90, ideal: 110)
         }
+        .overlay { if visible.isEmpty && !query.isEmpty { ContentUnavailableView.search(text: query) } }
         .contextMenu(forSelectionType: URL.self) { urls in
             Button("Mostrar no Finder") { NSWorkspace.shared.activateFileViewerSelecting(Array(urls)) }
             ForEach(openers, id: \.bundleID) { opener in
