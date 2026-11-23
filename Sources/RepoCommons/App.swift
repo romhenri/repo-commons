@@ -281,6 +281,9 @@ struct ContentView: View {
             }
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Image(nsImage: appIcon).resizable().frame(width: 24, height: 24).accessibilityHidden(true)
+            }
             ToolbarItemGroup {
                 Button("Adicionar pasta", systemImage: "folder.badge.plus") { store.addFolders() }
                 Group {
