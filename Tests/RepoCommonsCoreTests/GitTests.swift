@@ -280,3 +280,12 @@ private func pushFromElsewhere(_ root: URL, _ remote: URL, _ name: String) throw
     #expect(try sh(clone, "diff", "--name-only", "--diff-filter=U").isEmpty)
     #expect(try String(contentsOf: clone.appendingPathComponent("a"), encoding: .utf8) == "mine")
 }
+
+@Test func aHelperOutlivingGitDoesNotHoldTheCallUp() async throws {
+    let folder = try tempDir()
+    let start = Date()
+    // The alias backgrounds a child that inherits git's stdout and stays alive after git exits.
+    let out = try await Git.run(["-c", "alias.linger=!sleep 5 & echo done", "linger"], in: folder)
+    #expect(out.contains("done"))
+    #expect(Date().timeIntervalSince(start) < 3)
+}

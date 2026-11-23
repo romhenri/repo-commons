@@ -110,19 +110,24 @@ public enum Git {
         if env["GIT_SSH_COMMAND"] == nil { env["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes" }
         p.environment = env
         p.standardInput = FileHandle.nullDevice
-        let out = Pipe(), err = Pipe()
-        p.standardOutput = out
-        p.standardError = err
+        // Output goes to temp files, not pipes: a helper that outlives git (ssh, credential helper) would keep a
+        // pipe open and block the read past the timeout. Waiting on git's own exit can't be held up that way.
+        let tmp = FileManager.default.temporaryDirectory
+        let outURL = tmp.appendingPathComponent("rc-\(UUID().uuidString).out")
+        let errURL = tmp.appendingPathComponent("rc-\(UUID().uuidString).err")
+        FileManager.default.createFile(atPath: outURL.path, contents: nil)
+        FileManager.default.createFile(atPath: errURL.path, contents: nil)
+        defer { try? FileManager.default.removeItem(at: outURL); try? FileManager.default.removeItem(at: errURL) }
+        let outFile = try FileHandle(forWritingTo: outURL), errFile = try FileHandle(forWritingTo: errURL)
+        defer { try? outFile.close(); try? errFile.close() }
+        p.standardOutput = outFile
+        p.standardError = errFile
         try p.run()
         // ponytail: fixed 120s cap so a stalled fetch can't hang the batch forever; make it a setting if slow remotes need more.
         DispatchQueue.global().asyncAfter(deadline: .now() + 120) { if p.isRunning { p.terminate() } }
-        // Drain stderr concurrently so a chatty command can't fill the pipe and deadlock.
-        nonisolated(unsafe) var errData = Data() // safe: read only after group.wait()
-        let group = DispatchGroup()
-        DispatchQueue.global().async(group: group) { errData = err.fileHandleForReading.readDataToEndOfFile() }
-        let outData = out.fileHandleForReading.readDataToEndOfFile()
-        group.wait()
         p.waitUntilExit()
+        let outData = (try? Data(contentsOf: outURL)) ?? Data()
+        let errData = (try? Data(contentsOf: errURL)) ?? Data()
         if p.terminationReason == .uncaughtSignal {
             throw GitError(message: "git \(args.joined(separator: " ")) timed out")
         }
