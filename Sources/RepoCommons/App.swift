@@ -58,7 +58,7 @@ final class Store {
     /// Copies the pending-work report of one folder, or of all folders when nil (ignored repos excluded).
     func copyReport(for folder: URL?) {
         let repos = repos.compactMap { repo in
-            (folder == nil || repo.folder == folder) && !isIgnored(repo.url) ? repo.status.map { (url: repo.url, status: $0) } : nil
+            (folder == nil || repo.folder == folder) && !isIgnored(repo.url) ? (url: repo.url, status: repo.status) : nil
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(pendingReport(scope: folder?.path ?? "todas as pastas", repos: repos), forType: .string)
@@ -113,7 +113,8 @@ final class Store {
                     if $0.failed { $0.result = nil; $0.failed = false }
                 }
             } catch {
-                await self.update(url) { $0.result = Self.message(error); $0.failed = true }
+                // Drop the cached status: stale counts must not look current or reach a report.
+                await self.update(url) { $0.status = nil; $0.result = Self.message(error); $0.failed = true }
             }
         }
     }
@@ -140,11 +141,14 @@ final class Store {
                 result = Self.message(error)
                 failed = true
             }
-            let status = try? await Git.status(of: url)
-            await self.update(url) {
+            var status: RepoStatus?
+            do { status = try await Git.status(of: url) } catch {
+                if !failed { result = Self.message(error); failed = true }
+            }
+            await self.update(url) { [status] in
                 $0.result = result
                 $0.failed = failed
-                if let status { $0.status = status }
+                $0.status = status
             }
         }
     }

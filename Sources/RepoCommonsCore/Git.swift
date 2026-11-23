@@ -147,18 +147,27 @@ extension RepoStatus {
 }
 
 /// Markdown list of the repos with pending work, one absolute path per line, meant to be pasted into a coding agent.
-/// `scope` names where the repos come from: a folder path, or "todas as pastas".
-public func pendingReport(scope: String, repos: [(url: URL, status: RepoStatus)]) -> String {
-    let pending = repos.filter { $0.status.isPending }.sorted { $0.url.path < $1.url.path }
-    guard !pending.isEmpty else { return "Nenhum repo com mudanças pendentes em \(scope).\n" }
+/// `scope` names where the repos come from: a folder path, or "todas as pastas". A nil status means the repo
+/// could not be checked; those are listed apart so a failed check never reads as "nothing pending".
+public func pendingReport(scope: String, repos: [(url: URL, status: RepoStatus?)]) -> String {
+    let pending = repos.compactMap { r in r.status.flatMap { $0.isPending ? (url: r.url, status: $0) : nil } }
+        .sorted { $0.url.path < $1.url.path }
+    let unchecked = repos.filter { $0.status == nil }.map(\.url.path).sorted()
     func count(_ n: Int, _ one: String, _ many: String) -> String { "\(n) \(n == 1 ? one : many)" }
-    let lines = pending.map { url, s in
-        var parts: [String] = []
-        if s.changes > 0 { parts.append(count(s.changes, "arquivo não commitado", "arquivos não commitados")) }
-        if s.ahead > 0 { parts.append(count(s.ahead, "commit não enviado", "commits não enviados")) }
-        if s.branch != nil && !s.hasUpstream { parts.append("sem upstream") }
-        if s.behind > 0 { parts.append(count(s.behind, "commit atrás do remoto", "commits atrás do remoto")) }
-        return "- \(url.path) [\(s.branch ?? "detached")]: " + parts.joined(separator: ", ")
+    func section(_ title: String, _ lines: [String]) -> String {
+        "\(title) em \(scope) (\(lines.count)):\n\n" + lines.joined(separator: "\n") + "\n"
     }
-    return "Repos com mudanças pendentes em \(scope) (\(pending.count)):\n\n" + lines.joined(separator: "\n") + "\n"
+    var sections: [String] = []
+    if !pending.isEmpty {
+        sections.append(section("Repos com mudanças pendentes", pending.map { url, s in
+            var parts: [String] = []
+            if s.changes > 0 { parts.append(count(s.changes, "arquivo não commitado", "arquivos não commitados")) }
+            if s.ahead > 0 { parts.append(count(s.ahead, "commit não enviado", "commits não enviados")) }
+            if s.branch != nil && !s.hasUpstream { parts.append("sem upstream") }
+            if s.behind > 0 { parts.append(count(s.behind, "commit atrás do remoto", "commits atrás do remoto")) }
+            return "- \(url.path) [\(s.branch ?? "detached")]: " + parts.joined(separator: ", ")
+        }))
+    }
+    if !unchecked.isEmpty { sections.append(section("Repos com status não verificado", unchecked.map { "- \($0)" })) }
+    return sections.isEmpty ? "Nenhum repo com mudanças pendentes em \(scope).\n" : sections.joined(separator: "\n")
 }

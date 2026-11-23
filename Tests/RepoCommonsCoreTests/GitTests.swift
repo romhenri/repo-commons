@@ -289,3 +289,27 @@ private func pushFromElsewhere(_ root: URL, _ remote: URL, _ name: String) throw
     #expect(out.contains("done"))
     #expect(Date().timeIntervalSince(start) < 3)
 }
+
+@Test func pendingReportListsReposWhoseStatusIsUnknown() {
+    var dirty = RepoStatus(); dirty.branch = "main"; dirty.hasUpstream = true; dirty.changes = 1
+    let report = pendingReport(scope: "/w", repos: [
+        (URL(fileURLWithPath: "/w/b"), nil),
+        (URL(fileURLWithPath: "/w/a"), dirty),
+    ])
+    #expect(report == """
+    Repos com mudanças pendentes em /w (1):
+
+    - /w/a [main]: 1 arquivo não commitado
+
+    Repos com status não verificado em /w (1):
+
+    - /w/b
+
+    """)
+    #expect(pendingReport(scope: "/w", repos: [(URL(fileURLWithPath: "/w/b"), nil)]) == """
+    Repos com status não verificado em /w (1):
+
+    - /w/b
+
+    """)
+}
