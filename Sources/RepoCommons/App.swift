@@ -50,6 +50,8 @@ final class Store {
     private(set) var folders = (UserDefaults.standard.stringArray(forKey: "folders") ?? []).map { URL(fileURLWithPath: $0) }
     private(set) var repos: [Repo] = []
     private(set) var running = false
+    /// A refresh asked for while busy (e.g. a folder added mid-batch) runs when the current work ends.
+    private var refreshQueued = false
     /// Paths of repos the user chose to ignore: hidden from the dashboard and skipped by batch fetch/pull.
     private(set) var ignored = Set(UserDefaults.standard.stringArray(forKey: "ignored") ?? [])
 
@@ -93,9 +95,8 @@ final class Store {
 
     /// Rescans folders and reloads every repo's status. Keeps the last fetch/pull result per repo.
     func refresh() async {
-        guard !running else { return }
+        guard !running else { refreshQueued = true; return }
         running = true
-        defer { running = false }
         let previous = Dictionary(repos.map { ($0.url, $0) }, uniquingKeysWith: { a, _ in a })
         var seen = Set<URL>() // a repo under two nested root folders is listed once
         repos = folders.flatMap { folder in
@@ -117,6 +118,12 @@ final class Store {
                 await self.update(url) { $0.status = nil; $0.result = Self.message(error); $0.failed = true }
             }
         }
+        await finish()
+    }
+
+    private func finish() async {
+        running = false
+        if refreshQueued { refreshQueued = false; await refresh() }
     }
 
     /// Batch op over a folder, or every folder when nil, skipping ignored repos.
@@ -127,7 +134,6 @@ final class Store {
     func run(_ op: Op, on targets: [URL]) async {
         guard !running else { return }
         running = true
-        defer { running = false }
         for url in targets { update(url) { $0.busy = true } }
         await Git.batch(targets) { url in
             var result = "\(op.rawValue) ok", failed = false
@@ -151,6 +157,7 @@ final class Store {
                 $0.status = status
             }
         }
+        await finish()
     }
 
     private func update(_ url: URL, _ change: (inout Repo) -> Void) {
