@@ -268,3 +268,15 @@ private func pushFromElsewhere(_ root: URL, _ remote: URL, _ name: String) throw
     await #expect(throws: GitError.self) { try await Git.push(clone) }
     #expect(try sh(remote, "log", "--format=%s", "-1").contains("theirs"))
 }
+
+@Test func pullNeverAutostashesIntoAConflict() async throws {
+    let (root, remote, clone) = try clonedRepo()
+    try pushFromElsewhere(root, remote, "a")      // remote edits a
+    try sh(clone, "config", "merge.autostash", "true")
+    try write(clone, "a", "mine")                 // overlapping local edit
+    try await Git.fetch(clone)
+
+    await #expect(throws: GitError.self) { try await Git.pull(clone) }
+    #expect(try sh(clone, "diff", "--name-only", "--diff-filter=U").isEmpty)
+    #expect(try String(contentsOf: clone.appendingPathComponent("a"), encoding: .utf8) == "mine")
+}

@@ -69,8 +69,9 @@ public enum Git {
     }
 
     /// Fast-forward only: a diverged branch fails with git's message and the repo is left untouched.
+    /// --no-autostash overrides merge.autostash, which could pop local edits into a conflict and still exit 0.
     public static func pull(_ repo: URL) async throws {
-        _ = try await run(["pull", "--ff-only", "--quiet"], in: repo)
+        _ = try await run(["pull", "--ff-only", "--no-autostash", "--quiet"], in: repo)
     }
 
     /// Plain `git push`, never forced: a diverged remote is rejected with git's message.
